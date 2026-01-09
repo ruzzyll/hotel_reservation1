@@ -1,7 +1,7 @@
 <?php
 
-// Change this if your project folder name is different
-const BASE_PATH = '/hotel_reservation';
+// BASE_PATH will be auto-detected in bootstrap.php
+// Don't define it here to allow bootstrap.php to detect the actual path
 
 function start_session(): void
 {
