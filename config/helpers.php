@@ -1,74 +1,91 @@
 <?php
 
-// BASE_PATH will be auto-detected in bootstrap.php
-// Don't define it here to allow bootstrap.php to detect the actual path
+// --- NAVIGATION FUNCTIONS ---
 
-function start_session(): void
-{
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+if (!function_exists('redirect')) {
+    function redirect($url) {
+        // If the URL starts with '/', prepend the project folder (BASE_PATH)
+        // This fixes the "Not Found" errors automatically
+        if (defined('BASE_PATH') && strpos($url, '/') === 0) {
+            $url = BASE_PATH . $url;
+        }
+        header("Location: $url");
+        exit();
     }
 }
 
-function redirect(string $path): void
-{
-    // Prefix project base path for relative URLs
-    if (isset($path[0]) && $path[0] === '/') {
-        $path = BASE_PATH . $path;
-    }
-    header("Location: {$path}");
-    exit;
-}
+// --- FLASH MESSAGE FUNCTIONS ---
 
-function is_logged_in(): bool
-{
-    return !empty($_SESSION['user']);
-}
-
-function current_user(): ?array
-{
-    return $_SESSION['user'] ?? null;
-}
-
-function require_login(): void
-{
-    if (!is_logged_in()) {
-        redirect('/auth/login.php');
+if (!function_exists('set_flash')) {
+    function set_flash($key, $message) {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $_SESSION['flash'][$key] = $message;
     }
 }
 
-function require_role(array $roles): void
-{
-    require_login();
-    $user = current_user();
-    if (!in_array($user['role'], $roles, true)) {
-        redirect('/auth/login.php');
+if (!function_exists('flash')) {
+    function flash($key, $message) {
+        set_flash($key, $message);
     }
 }
 
-function flash(string $key, string $message): void
-{
-    $_SESSION['flash'][$key] = $message;
-}
-
-function get_flash(string $key): ?string
-{
-    if (!empty($_SESSION['flash'][$key])) {
-        $msg = $_SESSION['flash'][$key];
-        unset($_SESSION['flash'][$key]);
-        return $msg;
+if (!function_exists('get_flash')) {
+    function get_flash($key) {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        if (isset($_SESSION['flash'][$key])) {
+            $message = $_SESSION['flash'][$key];
+            unset($_SESSION['flash'][$key]);
+            return $message;
+        }
+        return null;
     }
-    return null;
 }
 
-function log_action(PDO $pdo, int $userId, string $action): void
-{
-    $stmt = $pdo->prepare("INSERT INTO logs (user_id, action, ip_address) VALUES (?, ?, ?)");
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $stmt->execute([$userId, $action, $ip]);
+// --- SECURITY & USER FUNCTIONS ---
+
+if (!function_exists('safe_output')) {
+    function safe_output($text) {
+        return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
+    }
 }
 
-function safe_output(string $value): string
-{
-    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+if (!function_exists('current_user')) {
+    function current_user() {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        return $_SESSION['user'] ?? null;
+    }
 }
+
+// --- AUTHENTICATION CHECKS (Restored) ---
+
+if (!function_exists('require_role')) {
+    function require_role($allowed_roles) {
+        if (!is_array($allowed_roles)) {
+            $allowed_roles = [$allowed_roles];
+        }
+        
+        $user = current_user();
+        
+        // Check if user is logged in AND has the correct role
+        if (!$user || !in_array($user['role'], $allowed_roles)) {
+            set_flash('error', 'You must log in to access this page.');
+            
+            // Redirect to login (Smart redirect will handle the path)
+            redirect('/auth/login.php');
+        }
+    }
+}
+
+// --- DATABASE LOGGING ---
+
+if (!function_exists('log_action')) {
+    function log_action($pdo, $user_id, $action) {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO logs (user_id, action, created_at) VALUES (?, ?, NOW())");
+            $stmt->execute([$user_id, $action]);
+        } catch (Exception $e) {
+            // Silently fail if logs table doesn't exist so the app doesn't crash
+        }
+    }
+}
+?>

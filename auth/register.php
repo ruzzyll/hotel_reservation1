@@ -12,14 +12,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!in_array($role, ['admin', 'staff'], true)) {
         flash('error', 'Invalid role selected.');
-        redirect('/auth/register.php');
+        redirect('register.php');
     }
 
     $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
         flash('error', 'Email already registered.');
-        redirect('/auth/register.php');
+        redirect('register.php');
     }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $userId = (int)$pdo->lastInsertId();
     log_action($pdo, $userId, "registered as {$role}");
     flash('success', 'Account created, you can now login.');
-    redirect('/auth/login.php');
+    redirect('login.php');
 }
 ?>
 <!doctype html>
